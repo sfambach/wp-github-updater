@@ -10,6 +10,8 @@ Updates plugins hosted in public GitHub repositories from their latest release.
 
 == Description ==
 
+AI disclosure: This plugin was built with AI assistance. The code was written largely by Claude (Anthropic) via Claude Code; Stefan Fambach specified, reviewed and tested it.
+
 Every installed plugin with a `GitHub Plugin URI: owner/repo` header is checked against the latest GitHub release (cached for 6 hours, "Check again" on the Updates screen checks fresh). Updates appear on the normal WordPress Updates screen, and WordPress's own "Enable auto-updates" link works for them too.
 
 For AI connectors (MCP) two abilities are registered:
