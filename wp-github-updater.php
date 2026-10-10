@@ -3,7 +3,7 @@
  * Plugin Name:       WP GitHub Updater
  * Plugin URI:        https://github.com/sfambach/wp-github-updater
  * Description:       Updates plugins with a "GitHub Plugin URI" header from their latest GitHub release, via the normal WordPress update screen. Optional abilities let an AI connector check and run the updates.
- * Version:           1.0.0
+ * Version:           1.0.1
  * Requires at least: 6.9
  * Requires PHP:      7.4
  * Author:            Stefan Fambach
