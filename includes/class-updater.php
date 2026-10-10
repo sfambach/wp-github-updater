@@ -24,6 +24,8 @@ final class WP_Github_Updater {
 	private const ERROR_TTL     = 30 * MINUTE_IN_SECONDS;
 	private const API_RELEASE   = 'https://api.github.com/repos/%s/releases/latest';
 	private const RELEASE_PAGE  = 'https://github.com/%s/releases/tag/%s';
+	private const LATEST_PAGE   = 'https://github.com/%s/releases/latest';
+	private const TAG_ARCHIVE   = 'https://github.com/%s/archive/refs/tags/%s.zip';
 
 	/**
 	 * Hook registration.
@@ -110,6 +112,25 @@ final class WP_Github_Updater {
 			return array() === $cached ? null : $cached;
 		}
 
+		$release = self::release_from_api( $repo ) ?? self::release_from_redirect( $repo );
+
+		if ( null === $release ) {
+			set_site_transient( $key, array(), self::ERROR_TTL );
+			return null;
+		}
+
+		set_site_transient( $key, $release, self::CACHE_TTL );
+
+		return $release;
+	}
+
+	/**
+	 * Latest release via the REST API.
+	 *
+	 * @param string $repo owner/repo.
+	 * @return array{version: string, tag: string, package: string, url: string, body: string, published: string}|null
+	 */
+	private static function release_from_api( string $repo ): ?array {
 		$response = wp_remote_get(
 			sprintf( self::API_RELEASE, $repo ),
 			array(
@@ -121,12 +142,12 @@ final class WP_Github_Updater {
 		$data = json_decode( (string) wp_remote_retrieve_body( $response ), true );
 
 		if ( 200 !== (int) wp_remote_retrieve_response_code( $response ) || ! is_array( $data ) || empty( $data['tag_name'] ) ) {
-			set_site_transient( $key, array(), self::ERROR_TTL );
 			return null;
 		}
 
-		$tag     = (string) $data['tag_name'];
-		$release = array(
+		$tag = (string) $data['tag_name'];
+
+		return array(
 			'version'   => ltrim( $tag, 'vV' ),
 			'tag'       => $tag,
 			'package'   => (string) ( $data['zipball_url'] ?? '' ),
@@ -134,10 +155,42 @@ final class WP_Github_Updater {
 			'body'      => (string) ( $data['body'] ?? '' ),
 			'published' => (string) ( $data['published_at'] ?? '' ),
 		);
+	}
 
-		set_site_transient( $key, $release, self::CACHE_TTL );
+	/**
+	 * Latest release from the redirect of github.com/owner/repo/releases/latest.
+	 *
+	 * The API allows 60 anonymous requests per hour and IP, which a shared host
+	 * may use up; the web redirect has no such limit.
+	 *
+	 * @param string $repo owner/repo.
+	 * @return array{version: string, tag: string, package: string, url: string, body: string, published: string}|null
+	 */
+	private static function release_from_redirect( string $repo ): ?array {
+		$response = wp_remote_head(
+			sprintf( self::LATEST_PAGE, $repo ),
+			array(
+				'timeout'     => 10,
+				'redirection' => 0,
+			)
+		);
 
-		return $release;
+		$location = (string) wp_remote_retrieve_header( $response, 'location' );
+
+		if ( 1 !== preg_match( '#/releases/tag/([^/?\#]+)$#', $location, $match ) ) {
+			return null;
+		}
+
+		$tag = rawurldecode( $match[1] );
+
+		return array(
+			'version'   => ltrim( $tag, 'vV' ),
+			'tag'       => $tag,
+			'package'   => sprintf( self::TAG_ARCHIVE, $repo, rawurlencode( $tag ) ),
+			'url'       => sprintf( self::RELEASE_PAGE, $repo, rawurlencode( $tag ) ),
+			'body'      => '',
+			'published' => '',
+		);
 	}
 
 	/**
