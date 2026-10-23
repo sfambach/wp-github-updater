@@ -3,7 +3,7 @@ Contributors: sfambach
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.1
+Stable tag: 1.1.2
 License: GPL-2.0-or-later
 
 Updates plugins hosted in public GitHub repositories from their latest release.
@@ -22,6 +22,11 @@ For AI connectors (MCP) two abilities are registered:
 Only public repositories are supported; no token is needed.
 
 == Changelog ==
+
+= 1.1.2 =
+* Finds the GitHub header even when another plugin listed the installed plugins before this one loaded; until now the Updates screen then showed no GitHub updates at all.
+* A failed check (GitHub rate limit, timeout) keeps the release already known instead of hiding it for 30 minutes.
+* Ability github-updater/status reports `offered`: the version the Updates screen currently shows.
 
 = 1.1.1 =
 * New releases show up within an hour instead of only after core's 12-hour check or a manual update.

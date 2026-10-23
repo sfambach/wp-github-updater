@@ -61,6 +61,7 @@ final class WP_Github_Updater_Abilities {
 					'latest'    => array( 'type' => 'string' ),
 					'update'    => array( 'type' => 'boolean' ),
 					'release'   => array( 'type' => 'string' ),
+					'offered'   => array( 'type' => 'string' ),
 					'result'    => array( 'type' => 'string' ),
 				),
 			),
@@ -133,7 +134,8 @@ final class WP_Github_Updater_Abilities {
 	 * @return array<int, array<string, mixed>>
 	 */
 	public static function status(): array {
-		$rows = array();
+		$rows    = array();
+		$offered = get_site_transient( 'update_plugins' );
 
 		foreach ( WP_Github_Updater::managed_plugins() as $file => $plugin ) {
 			$release = WP_Github_Updater::latest_release( $plugin['repo'], true );
@@ -144,6 +146,8 @@ final class WP_Github_Updater_Abilities {
 				'latest'    => null === $release ? '' : $release['version'],
 				'update'    => null !== $release && version_compare( $release['version'], $plugin['version'], '>' ),
 				'release'   => null === $release ? '' : $release['url'],
+				// What the Updates screen sees; differs from "update" only when the core transient is out of step.
+				'offered'   => is_object( $offered ) && isset( $offered->response[ $file ] ) ? (string) $offered->response[ $file ]->new_version : '',
 			);
 		}
 

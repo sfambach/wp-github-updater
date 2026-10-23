@@ -73,9 +73,18 @@ final class WP_Github_Updater {
 			require_once ABSPATH . 'wp-admin/includes/plugin.php';
 		}
 
+		static $headers = array();
+
 		$managed = array();
 		foreach ( get_plugins() as $file => $data ) {
-			$repo = self::parse_repo( (string) ( $data[ self::HEADER ] ?? '' ) );
+			// get_plugins() caches per request; if anything listed the plugins before our header filter was added, the header is missing there, so read it from the file.
+			if ( ! array_key_exists( $file, $headers ) ) {
+				$headers[ $file ] = (string) ( $data[ self::HEADER ] ?? '' );
+				if ( '' === $headers[ $file ] && is_readable( WP_PLUGIN_DIR . '/' . $file ) ) {
+					$headers[ $file ] = (string) get_file_data( WP_PLUGIN_DIR . '/' . $file, array( 'repo' => self::HEADER ) )['repo'];
+				}
+			}
+			$repo = self::parse_repo( $headers[ $file ] );
 			if ( '' === $repo ) {
 				continue;
 			}
@@ -111,17 +120,19 @@ final class WP_Github_Updater {
 	 */
 	public static function latest_release( string $repo, bool $fresh = false ): ?array {
 		$key    = self::CACHE_PREFIX . md5( $repo );
-		$cached = $fresh ? false : get_site_transient( $key );
+		$cached = get_site_transient( $key );
 
-		if ( is_array( $cached ) ) {
+		if ( ! $fresh && is_array( $cached ) ) {
 			return array() === $cached ? null : $cached;
 		}
 
 		$release = self::release_from_api( $repo ) ?? self::release_from_redirect( $repo );
 
 		if ( null === $release ) {
-			set_site_transient( $key, array(), self::ERROR_TTL );
-			return null;
+			// A failed check (rate limit, timeout) must not hide a release we already know.
+			$known = is_array( $cached ) && array() !== $cached ? $cached : null;
+			set_site_transient( $key, $known ?? array(), self::ERROR_TTL );
+			return $known;
 		}
 
 		set_site_transient( $key, $release, self::CACHE_TTL );
