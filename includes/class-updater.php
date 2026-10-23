@@ -19,13 +19,14 @@ if ( ! defined( 'ABSPATH' ) ) {
 final class WP_Github_Updater {
 
 	private const HEADER        = 'GitHub Plugin URI';
-	private const CACHE_PREFIX  = 'wpghu_release_';
+	private const CACHE_PREFIX  = 'wpghu_release2_';
 	private const CACHE_TTL     = 6 * HOUR_IN_SECONDS;
 	private const ERROR_TTL     = 30 * MINUTE_IN_SECONDS;
 	private const API_RELEASE   = 'https://api.github.com/repos/%s/releases/latest';
 	private const RELEASE_PAGE  = 'https://github.com/%s/releases/tag/%s';
 	private const LATEST_PAGE   = 'https://github.com/%s/releases/latest';
 	private const TAG_ARCHIVE   = 'https://github.com/%s/archive/refs/tags/%s.zip';
+	private const ASSET         = 'https://github.com/%s/releases/download/%s/%s';
 
 	/**
 	 * Hook registration.
@@ -145,12 +146,14 @@ final class WP_Github_Updater {
 			return null;
 		}
 
-		$tag = (string) $data['tag_name'];
+		$tag    = (string) $data['tag_name'];
+		$source = (string) ( $data['zipball_url'] ?? '' );
+		$asset  = self::zip_asset( $repo, is_array( $data['assets'] ?? null ) ? $data['assets'] : array() );
 
 		return array(
 			'version'   => ltrim( $tag, 'vV' ),
 			'tag'       => $tag,
-			'package'   => (string) ( $data['zipball_url'] ?? '' ),
+			'package'   => '' !== $asset ? $asset : $source,
 			'url'       => sprintf( self::RELEASE_PAGE, $repo, rawurlencode( $tag ) ),
 			'body'      => (string) ( $data['body'] ?? '' ),
 			'published' => (string) ( $data['published_at'] ?? '' ),
@@ -181,16 +184,77 @@ final class WP_Github_Updater {
 			return null;
 		}
 
-		$tag = rawurldecode( $match[1] );
+		$tag    = rawurldecode( $match[1] );
+		$source = sprintf( self::TAG_ARCHIVE, $repo, rawurlencode( $tag ) );
+		$asset  = self::guess_zip_asset( $repo, $tag );
 
 		return array(
 			'version'   => ltrim( $tag, 'vV' ),
 			'tag'       => $tag,
-			'package'   => sprintf( self::TAG_ARCHIVE, $repo, rawurlencode( $tag ) ),
+			'package'   => '' !== $asset ? $asset : $source,
 			'url'       => sprintf( self::RELEASE_PAGE, $repo, rawurlencode( $tag ) ),
 			'body'      => '',
 			'published' => '',
 		);
+	}
+
+	/**
+	 * Download URL of the built ZIP attached to a release, if any.
+	 *
+	 * Plugins with a build step (Composer vendor/, compiled blocks) only work
+	 * from that asset; the source archive lacks the generated files.
+	 *
+	 * @param string                           $repo   owner/repo.
+	 * @param array<int, array<string, mixed>> $assets Release assets from the API.
+	 * @return string Empty when the release has no ZIP asset.
+	 */
+	private static function zip_asset( string $repo, array $assets ): string {
+		$name  = basename( $repo );
+		$first = '';
+
+		foreach ( $assets as $asset ) {
+			$file = (string) ( $asset['name'] ?? '' );
+			$url  = (string) ( $asset['browser_download_url'] ?? '' );
+			if ( '' === $url || ! str_ends_with( strtolower( $file ), '.zip' ) ) {
+				continue;
+			}
+			if ( str_starts_with( $file, $name ) ) {
+				return $url;
+			}
+			if ( '' === $first ) {
+				$first = $url;
+			}
+		}
+
+		return $first;
+	}
+
+	/**
+	 * Probe the usual asset names when only the web redirect is available.
+	 *
+	 * @param string $repo owner/repo.
+	 * @param string $tag  Release tag.
+	 * @return string Empty when none of them exists.
+	 */
+	private static function guess_zip_asset( string $repo, string $tag ): string {
+		$name = basename( $repo );
+
+		foreach ( array_unique( array( $name . '-' . $tag . '.zip', $name . '-' . ltrim( $tag, 'vV' ) . '.zip', $name . '.zip' ) ) as $file ) {
+			$url      = sprintf( self::ASSET, $repo, rawurlencode( $tag ), rawurlencode( $file ) );
+			$response = wp_remote_head(
+				$url,
+				array(
+					'timeout'     => 10,
+					'redirection' => 0,
+				)
+			);
+			$code     = (int) wp_remote_retrieve_response_code( $response );
+			if ( $code >= 200 && $code < 400 ) {
+				return $url;
+			}
+		}
+
+		return '';
 	}
 
 	/**
@@ -277,7 +341,7 @@ final class WP_Github_Updater {
 	}
 
 	/**
-	 * GitHub zipballs unpack to "owner-repo-sha"; rename to the installed plugin folder.
+	 * Rename the unpacked folder ("owner-repo-sha" for zipballs, the repo name for assets) to the installed plugin folder.
 	 *
 	 * @param string|WP_Error $source        Unpacked source path.
 	 * @param string          $remote_source Upgrade working directory.
