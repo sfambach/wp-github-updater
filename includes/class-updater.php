@@ -20,7 +20,7 @@ final class WP_Github_Updater {
 
 	private const HEADER        = 'GitHub Plugin URI';
 	private const CACHE_PREFIX  = 'wpghu_release2_';
-	private const CACHE_TTL     = 6 * HOUR_IN_SECONDS;
+	private const CACHE_TTL     = HOUR_IN_SECONDS;
 	private const ERROR_TTL     = 30 * MINUTE_IN_SECONDS;
 	private const API_RELEASE   = 'https://api.github.com/repos/%s/releases/latest';
 	private const RELEASE_PAGE  = 'https://github.com/%s/releases/tag/%s';
@@ -37,6 +37,10 @@ final class WP_Github_Updater {
 
 		/** @see https://developer.wordpress.org/reference/hooks/pre_set_site_transient_transient/ */
 		add_filter( 'pre_set_site_transient_update_plugins', array( self::class, 'inject_updates' ) );
+
+		// Core refreshes update_plugins only every 12 hours; reading through our own hourly cache shows a new release without waiting for that.
+		/** @see https://developer.wordpress.org/reference/hooks/site_transient_transient/ */
+		add_filter( 'site_transient_update_plugins', array( self::class, 'inject_updates' ) );
 
 		/** @see https://developer.wordpress.org/reference/hooks/plugins_api/ */
 		add_filter( 'plugins_api', array( self::class, 'plugin_info' ), 20, 3 );
@@ -268,8 +272,11 @@ final class WP_Github_Updater {
 			return $transient;
 		}
 
+		static $forced = false;
+
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Read-only flag set by core's "Check again" link.
-		$fresh = isset( $_GET['force-check'] );
+		$fresh  = ! $forced && isset( $_GET['force-check'] );
+		$forced = $forced || $fresh;
 
 		foreach ( self::managed_plugins() as $file => $plugin ) {
 			$release = self::latest_release( $plugin['repo'], $fresh );
@@ -289,7 +296,8 @@ final class WP_Github_Updater {
 			if ( version_compare( $release['version'], $plugin['version'], '>' ) ) {
 				$transient->response[ $file ] = $item;
 				unset( $transient->no_update[ $file ] );
-			} elseif ( ! isset( $transient->response[ $file ] ) ) {
+			} else {
+				unset( $transient->response[ $file ] );
 				$transient->no_update[ $file ] = $item;
 			}
 		}

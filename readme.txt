@@ -3,7 +3,7 @@ Contributors: sfambach
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPL-2.0-or-later
 
 Updates plugins hosted in public GitHub repositories from their latest release.
@@ -22,6 +22,9 @@ For AI connectors (MCP) two abilities are registered:
 Only public repositories are supported; no token is needed.
 
 == Changelog ==
+
+= 1.1.1 =
+* New releases show up within an hour instead of only after core's 12-hour check or a manual update.
 
 = 1.1.0 =
 * Installs the ZIP attached to a release when there is one (built plugins with vendor/ or build/), and the source archive only when there is none.
