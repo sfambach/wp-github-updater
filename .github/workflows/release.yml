@@ -34,3 +34,8 @@ jobs:
           files: wp-github-updater-*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Announce release to the site
+        env:
+          SITE: ${{ vars.WP_SITE_URL || 'https://www.fambach.net' }}
+        run: curl -fsS -X POST "$SITE/wp-json/github-updater/v1/refresh?repo=${{ github.repository }}" || echo "::warning::Site not notified; it picks the release up within an hour."
