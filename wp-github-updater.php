@@ -6,7 +6,7 @@
  * Version:           1.2.0
  * Requires at least: 6.9
  * Requires PHP:      7.4
- * Author:            Stefan Fambach
+ * Author:            Stefan Fambach (SteFam), Claude (Anthropic AI)
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       wp-github-updater
