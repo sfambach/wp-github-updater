@@ -99,10 +99,10 @@ final class WP_Github_Updater_Abilities {
 					'properties'           => array(
 						'plugin' => array(
 							'type'        => 'string',
-							'description' => 'Plugin slug or file; empty or "all" updates every GitHub plugin with a newer release.',
-							'default'     => 'all',
+							'description' => 'Plugin slug or file, or "all" for every GitHub plugin with a newer release.',
 						),
 					),
+					'required'             => array( 'plugin' ),
 					'additionalProperties' => false,
 				),
 				'output_schema'       => $plugin_list,
@@ -161,7 +161,18 @@ final class WP_Github_Updater_Abilities {
 	 * @return array<int, array<string, mixed>>|WP_Error
 	 */
 	public static function update( $input = null ) {
-		$wanted = is_array( $input ) ? trim( (string) ( $input['plugin'] ?? '' ) ) : '';
+		$input = is_array( $input ) ? $input : array();
+
+		// The schema forbids other keys, but not every client enforces it; an ignored key ("slug") must never widen the update to every plugin.
+		$unknown = array_diff( array_keys( $input ), array( 'plugin' ) );
+		if ( array() !== $unknown ) {
+			return new WP_Error( 'wpghu_unknown_input', sprintf( __( 'Unknown input: %s. Use "plugin".', 'wp-github-updater' ), implode( ', ', $unknown ) ) );
+		}
+
+		$wanted = trim( (string) ( $input['plugin'] ?? '' ) );
+		if ( '' === $wanted ) {
+			return new WP_Error( 'wpghu_no_plugin', __( 'Name a plugin, or "all" to update every GitHub plugin.', 'wp-github-updater' ) );
+		}
 		$wanted = 'all' === $wanted ? '' : $wanted;
 
 		require_once ABSPATH . 'wp-admin/includes/admin.php';
