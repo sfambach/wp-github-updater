@@ -3,7 +3,7 @@ Contributors: sfambach
 Requires at least: 6.9
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 1.2.0
+Stable tag: 1.2.1
 License: GPL-2.0-or-later
 
 Updates plugins hosted in public GitHub repositories from their latest release.
@@ -28,6 +28,9 @@ The endpoint only re-reads the latest public release of an installed plugin and 
 Only public repositories are supported; no token is needed.
 
 == Changelog ==
+
+= 1.2.1 =
+* github-updater/update needs "plugin" (a slug, a file or "all") and refuses unknown keys; a call with a wrong key no longer updates every plugin.
 
 = 1.2.0 =
 * REST endpoint `POST /wp-json/github-updater/v1/refresh?repo=owner/repo`: a release workflow calls it and the release shows up on the Updates screen at once.
